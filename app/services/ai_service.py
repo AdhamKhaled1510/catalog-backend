@@ -15,6 +15,8 @@ async def extract_products_from_text(text: str) -> List[ProductItem]:
         return await _extract_with_openai(text)
     elif provider == "anthropic":
         return await _extract_with_anthropic(text)
+    elif provider == "gemini":
+        return await _extract_with_gemini(text)
 
     return _extract_local(text)
 
@@ -182,6 +184,33 @@ async def _extract_with_ollama(text: str) -> List[ProductItem]:
         data = resp.json()
         content = data.get("response", "[]")
 
+    return _parse_ai_response(content)
+
+
+# ====== Google Gemini (مجاني - ما عدا API Key) ======
+GEMINI_EXTRACTION_PROMPT = """Extract all products from this text. Return a JSON array.
+Each item: {"name": string, "price": number or null, "description": string or null}.
+
+Rules:
+- Extract each product separately
+- Remove greetings and conversational text
+- Price is a number (remove جنيه, LE, $, etc.)
+- Description is short if available
+- If no products, return []
+- ONLY valid JSON, no other text
+
+Text:
+"""
+
+
+async def _extract_with_gemini(text: str) -> List[ProductItem]:
+    import google.generativeai as genai
+
+    genai.configure(api_key=settings.google_api_key)
+    model = genai.GenerativeModel("gemini-2.0-flash-lite")
+    response = await model.generate_content_async(GEMINI_EXTRACTION_PROMPT + text)
+    content = response.text.strip()
+    content = re.sub(r'^```(?:json)?\s*|\s*```$', '', content)
     return _parse_ai_response(content)
 
 

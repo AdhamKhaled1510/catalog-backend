@@ -8,7 +8,9 @@ class ProductOut(BaseModel):
     name: str
     price: Optional[float] = None
     description: Optional[str] = None
+    category: Optional[str] = None
     image_url: Optional[str] = None
+    sort_order: int = 0
 
     class Config:
         from_attributes = True
@@ -19,6 +21,7 @@ class CatalogOut(BaseModel):
     title: str
     description: Optional[str] = None
     merchant_id: str
+    merchant_phone: Optional[str] = None
     is_public: bool
     products: List[ProductOut] = []
 
@@ -53,3 +56,11 @@ class ProductItem(BaseModel):
     name: str
     price: Optional[float] = None
     description: Optional[str] = None
+
+
+class ProductUpdate(BaseModel):
+    name: Optional[str] = None
+    price: Optional[float] = None
+    description: Optional[str] = None
+    category: Optional[str] = None
+    image_url: Optional[str] = None

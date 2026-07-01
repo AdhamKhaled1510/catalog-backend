@@ -1,9 +1,8 @@
 import uuid
 from datetime import datetime
 
-from sqlalchemy import String, Text, Float, DateTime, ForeignKey
+from sqlalchemy import String, Text, Float, DateTime, ForeignKey, Boolean
 from sqlalchemy.orm import Mapped, mapped_column, relationship
-from sqlalchemy.dialects.sqlite import TEXT
 
 from app.database import Base
 
@@ -19,6 +18,7 @@ class Merchant(Base):
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     phone: Mapped[str] = mapped_column(String(50), nullable=True)
     email: Mapped[str] = mapped_column(String(255), nullable=True)
+    password: Mapped[str] = mapped_column(String(255), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
     catalogs = relationship("Catalog", back_populates="merchant", cascade="all, delete-orphan")
@@ -35,7 +35,7 @@ class Catalog(Base):
     is_public: Mapped[bool] = mapped_column(default=True)
 
     merchant = relationship("Merchant", back_populates="catalogs")
-    products = relationship("Product", back_populates="catalog", cascade="all, delete-orphan", order_by="Product.id")
+    products = relationship("Product", back_populates="catalog", cascade="all, delete-orphan", order_by="Product.sort_order, Product.id")
 
 
 class Product(Base):
@@ -46,7 +46,9 @@ class Product(Base):
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     price: Mapped[float] = mapped_column(Float, nullable=True)
     description: Mapped[str] = mapped_column(Text, nullable=True)
-    image_url: Mapped[str] = mapped_column(String(500), nullable=True)
+    category: Mapped[str] = mapped_column(String(100), nullable=True)
+    image_url: Mapped[str] = mapped_column(Text, nullable=True)
+    sort_order: Mapped[int] = mapped_column(default=0)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
     catalog = relationship("Catalog", back_populates="products")
