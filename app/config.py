@@ -18,6 +18,7 @@ class Settings(BaseSettings):
         url = self.database_url
         if url.startswith("postgresql://"):
             url = url.replace("postgresql://", "postgresql+asyncpg://", 1)
+            url = url.split("?")[0]
         return url
 
 
