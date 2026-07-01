@@ -20,22 +20,98 @@ async def extract_products_from_text(text: str) -> List[ProductItem]:
 
 
 # ====== مجاني تماماً: استخراج بالقواعد (بدون أي API) ======
+_GREETINGS_PATTERN = re.compile(
+    r'^(السلام عليكم|وعليكم السلام|سلام|مرحبا|اهلا|مرحباً|تحية طيبة|بسم الله|يا باشا|يا كبير|يا عم|يا اخي|يا أخ)\s*',
+    re.IGNORECASE,
+)
+
+
 def _extract_local(text: str) -> List[ProductItem]:
+    text = text.strip()
+    for _ in range(10):
+        new_text = _GREETINGS_PATTERN.sub('', text).strip()
+        if new_text == text:
+            break
+        text = new_text
+
     products = []
-    lines = text.strip().split("\n")
 
-    for line in lines:
-        line = line.strip()
-        if not line or len(line) < 3:
-            continue
-        if re.match(r'^[\-•*#\d\.]+', line):
+    lines = text.split("\n")
+
+    # If all in one line (no line breaks) — try to split by numbered items
+    if len(lines) == 1:
+        products = _extract_from_one_line(text)
+    else:
+        for line in lines:
+            line = line.strip()
+            if not line or len(line) < 3:
+                continue
             line = re.sub(r'^[\-•*#\d\.\s]+', '', line).strip()
-
-        item = _parse_line(line)
-        if item:
-            products.append(item)
+            item = _parse_line(line)
+            if item:
+                products.append(item)
 
     return products
+
+
+_WORDS_TO_SKIP = re.compile(
+    r'^(عندي|عندنا|عندك|متوفر|متاح|يوجد|في|ومتوفر|وايضاً|أيضا|كمان|برضو|حد عندك|عند|معانا|موجود|ودي|ودا|دي|تشكيلة|مجموعة|مجموعات|جديد|الشتاء|الصيف|الربيع|الخريف|الجديد|الجديدة|أجمل|أحدث|أفضل)\s+',
+    re.IGNORECASE,
+)
+_NUMBER_PREFIX = re.compile(r'^\d+\s*[-.)]\s*')
+_DASH_SUFFIX = re.compile(r'\s*[-–—]+\s*$')
+
+def _clean_product_name(name: str) -> str:
+    name = _NUMBER_PREFIX.sub('', name).strip()
+    name = _DASH_SUFFIX.sub('', name).strip()
+    # Apply word skipping multiple times
+    for _ in range(5):
+        new_name = _WORDS_TO_SKIP.sub('', name).strip()
+        if new_name == name:
+            break
+        name = new_name
+    name = _NUMBER_PREFIX.sub('', name).strip()
+    return name
+
+def _extract_from_one_line(text: str) -> List[ProductItem]:
+    # Try: find price-like numbers and pair each with preceding text
+    matches = list(re.finditer(r'(.+?)\s*(\d{3,}(?:[.,]\d+)?)\s*(?:جنية|جنيه|ج\.م|LE|EGP|ريال|دولار)?\s*', text))
+    if len(matches) > 1:
+        result = []
+        end = 0
+        for i, m in enumerate(matches):
+            name = _clean_product_name(m.group(1).strip())
+            price = _parse_price(m.group(2))
+            if price is not None and len(name) > 1:
+                if i > 0 and m.start() > end:
+                    continue
+                name = _WORDS_TO_SKIP.sub('', name).strip()
+                if name:
+                    result.append(ProductItem(name=name, price=price))
+                end = m.end()
+        if result:
+            return result
+
+    # Try: split by number prefix: "1- ... 2- ... 3- ..."
+    numbered = re.split(r'(?=\d+\s*[-.)]\s*)', text)
+    if len(numbered) > 1:
+        result = []
+        for chunk in numbered:
+            chunk = chunk.strip()
+            if chunk and len(chunk) > 2:
+                item = _parse_line(chunk)
+                if item:
+                    item.name = _clean_product_name(item.name)
+                    result.append(item)
+        if result:
+            return result
+
+    # Last resort: single product extraction
+    item = _parse_line(text)
+    if item:
+        return [item]
+
+    return []
 
 
 _LINE_PATTERNS = [
